@@ -33,6 +33,8 @@ char Vofatail[4] = {0x00, 0x00, 0x80, 0x7f};
 extern ImuTypeDef       imu;
 static void IMU_Param_Correction(ImuParamTypeDef *param, float gyro[3], float accel[3]);
 
+uint8_t target_temp = 40;
+
 void ins_task(void const * argument)
 {
     /* USER CODE BEGIN InsTask */
@@ -53,7 +55,7 @@ void ins_task(void const * argument)
 
     IMU_QuaternionEKF_Init(10, 0.001, 1000000 * 10, 0.9996 * 0 + 1, 0);
     // imu heat init
-    PID_Init(&TempCtrl, 2000, 300, 0, 1000, 20, 0, 0, 0, 0, 0, 0, 0);
+    PID_Init(&TempCtrl, 1100, 10, 0, 210, 2, 0, 0, 0, 0, 0, 0, 0);
     HAL_TIM_PWM_Start(&htim10, TIM_CHANNEL_1);
     uint32_t ins_wake_time = osKernelSysTick();
     /* Infinite loop */
@@ -120,8 +122,8 @@ void ins_task(void const * argument)
         }
 
         // temperature control
-        if ((count % 2) == 0)
-        {
+//        if ((count % 2) == 0)
+//        {
             // 500hz
             IMU_Temperature_Ctrl();
 //            HAL_UART_Transmit(&huart1,(uint8_t *)&Testdata,sizeof(Testdata),0xFFFFFFFFU);
@@ -129,13 +131,13 @@ void ins_task(void const * argument)
 //            if (GlobalDebugMode == IMU_HEAT_DEBUG)
 //                Serial_Debug(&huart1, 1, RefTemp, BMI088.temperature, TempCtrl.Output / 1000.0f, TempCtrl.Pout / 1000.0f, TempCtrl.Iout / 1000.0f, TempCtrl.Dout / 1000.0f);
 //
-        }
+//        }
 
-        if ((count % 100) == 0)
+/*        if ((count % 100) == 0)
         {
         }
+        count++;*/
 
-        count++;
         HAL_GPIO_WritePin(GPIOE, task1_Pin, GPIO_PIN_RESET);
         vTaskDelayUntil(&ins_wake_time,1);
     }
@@ -325,9 +327,9 @@ static void IMU_Param_Correction(ImuParamTypeDef *param, float gyro[3], float ac
 
 void IMU_Temperature_Ctrl(void)
 {
-    PID_Calculate(&TempCtrl, BMI088.temperature, float_constrain(BMI088.temp_when_cali, 37, 42));
-
-    TIM_Set_PWM(&htim10, TIM_CHANNEL_1, float_constrain(float_rounding(TempCtrl.Output), 0, UINT32_MAX));
+    static uint32_t value = 0;
+    value = PID_Calculate(&TempCtrl, BMI088.temperature, target_temp);
+            __HAL_TIM_SetCompare(&htim10, TIM_CHANNEL_1, value);
 }
 
 void IMU_Get_data(ImuTypeDef *imu_data){
